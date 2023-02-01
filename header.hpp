@@ -4,16 +4,16 @@ using namespace std;
 const string FILENAME = "data_athlete_event.bin";
 
 struct Instancia{
-    string name;
-    string location;
-    string comment;
-    string type;
-    int size;
-    string distribution;
-    string depot;
-    int routeTime;
-    int timeWindow;
-    int capacity;
+	string name;
+	string location;
+	string comment;
+	string type;
+	int size;
+	string distribution;
+	string depot;
+	int routeTime;
+	int timeWindow;
+	int capacity;
 
 	void mostrarCampos(){
 		cout << "Nome: " << name << endl;
@@ -30,17 +30,17 @@ struct Instancia{
 };
 
 struct Node{
-    int id;
-    float lat;
-    float lon;
-    int dem;
-    int etw;
-    int ltw;
-    int dur;
-    int p;
-    int d;
+	int id;
+	float lat;
+	float lon;
+	int dem;
+	int etw;
+	int ltw;
+	int dur;
+	int p;
+	int d;
 
-    void mostrarCampos(){
+	void mostrarCampos(){
 		cout << "Id: " << id << endl;
 		cout << "Latitude: " << lat << endl;
 		cout << "Longitude: " << lon << endl;
