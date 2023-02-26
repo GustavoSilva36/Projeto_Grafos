@@ -2,22 +2,21 @@
 #include <fstream>
 #include <cstring>
 #include <string>
-#include <cstdlib>
-#include <ctime>
+#include <vector>
+#include <algorithm>
 #include "header.hpp"
 
 using namespace std;
 
-// le o arquivo selecionado e instancia todas as estruturas de dados
-bool lerArquivo(string nomeArq, Instancia &instancia, Node* &nos, int** &MA){
+bool lerArquivo(string nomeArq, Instancia &instancia, vector<Node> &nos, int** &MA){ // 
 	ifstream txt(nomeArq);
 
 	if(txt){
 		string str, str2;
 		int campo = 0;
 		
+		//o csv é lido caractere por caractere
 		txt >> str;
-		// define os dados da instancia
 		do{
 			getline(txt, str2);
 			size_t start = str2.find_first_not_of(" ");
@@ -60,33 +59,31 @@ bool lerArquivo(string nomeArq, Instancia &instancia, Node* &nos, int** &MA){
 
 			txt >> str;
 		}while (str != "NODES");
-		
-		// define os dados dos pontos/nós
-		nos = new Node[instancia.size];
 
 		for(int i=0; i<instancia.size; i++){
 			txt >> str;
-			nos[i].id = stoi(str);
+			Node aux;
+			aux.id = stoi(str);
 			txt >> str;
-			nos[i].lat = stof(str);
+			aux.lat = stof(str);
 			txt >> str;
-			nos[i].lon = stof(str);
+			aux.lon = stof(str);
 			txt >> str;
-			nos[i].dem = stoi(str);
+			aux.dem = stoi(str);
 			txt >> str;
-			nos[i].etw = stoi(str);
+			aux.etw = stoi(str);
 			txt >> str;
-			nos[i].ltw = stoi(str);
+			aux.ltw = stoi(str);
 			txt >> str;
-			nos[i].dur = stoi(str);
+			aux.dur = stoi(str);
 			txt >> str;
-			nos[i].p = stoi(str);
+			aux.p = stoi(str);
 			txt >> str;
-			nos[i].d = stoi(str);
-		}
-		
+			aux.d = stoi(str);
 
-		// define a matriz de adjacencias com os pesos
+			nos.push_back(aux);
+		}
+
 		MA = new int*[instancia.size];
 		for(int i=0; i<instancia.size; i++)
 			MA[i] = new int[instancia.size];
@@ -108,7 +105,6 @@ bool lerArquivo(string nomeArq, Instancia &instancia, Node* &nos, int** &MA){
 		return false;
 }
 
-// define os pacotes com seus pontos de coleta e entrega
 void definirPacotes(Pacote* &pacotes, Instancia &instancia, Node* &nos){
 	instancia.nPacotes = (instancia.size-1)/2;
 	pacotes = new Pacote[instancia.nPacotes];
@@ -129,99 +125,113 @@ void definirPacotes(Pacote* &pacotes, Instancia &instancia, Node* &nos){
 	}
 }
 
-// gera uma solução totalmente aleatoria para o problema
-void gerarSolucaoAleatoria(Instancia &instancia, Veiculo* &veiculos){
-    unsigned seed = time(0);
 
-    srand(seed);
+bool verificarRota(Instancia instancia, vector<Node> nos, int** MA, vector<int> rota, Pacote *pacotes){ // verifica uma rota gerada para um veiculo
+    Veiculo aux = Veiculo(0);
+    aux.rota = rota;
 
-	int nVeiculos = 10; // começar com apenas 10 veiculos
-	instancia.nVeiculos = nVeiculos;
-	veiculos = new Veiculo[nVeiculos];
+	int tempo = 0;
 
-	for(int i=0; i<nVeiculos; i++){
-		veiculos[i].id = i;
-		veiculos[i].nPontos = instancia.size/instancia.nVeiculos; // define o numero de pontos que o veiculo vai visitar
-		veiculos[i].rota = new int[veiculos[i].nPontos];
-		veiculos[i].rota[0] = 0;
-		// gera aleatoriamente os pontos que cada veiculo vai visitar 0 -> 1 -> 2 -> ... -> nPontos
-		// nessa forma os pontos podem se repetir
-		// todos os veiculos tem origem e destino no ponto 0
-		for(int j=1; j<veiculos[i].nPontos-1; j++){
-			veiculos[i].rota[j] = rand()%instancia.size;
-		}
-		veiculos[i].rota[veiculos[i].nPontos-1] = 0;
-		veiculos[i].carga = 0;
+	for(unsigned int i=1; i<rota.size(); i++){
+		int pAtual = rota[i];
+		Node pontoAtual = nos[pAtual];
+		Pacote pacote = pacotes[pontoAtual.idPacote];
+
+		// tempo de rota atual
+		int pAnterior = rota[i-1];
+		tempo += MA[pAnterior][pAtual];
+
+
+        if(pontoAtual.ltw < tempo){ // retorna rota invalida se o ponto visitado já foi fechado
+            return false;
+        }
+		if(pontoAtual.etw > tempo)
+            tempo += (pontoAtual.etw - tempo);
+
+		// se o no atual for uma entrega e o par dele de coleta não foi coletado retorna erro
+        if(pontoAtual.dem > 0){ // se for um ponto de coleta
+            pacote.coletado = true;
+        }
+        if(pontoAtual.dem < 0 and pacote.coletado){ // se for um ponto de entrega
+            pacote.entregue = true;
+        }
+
+        tempo += pontoAtual.dur;
+
+        aux.carga += pontoAtual.dem;
+
+        if(aux.carga > instancia.capacity) // retorna rota invalida se a capacidade passou do limite
+            return false;
+        
+        if(instancia.routeTime < tempo) // retorna rota invalida se o tempo da rota ultrapassou o tempo máximo estabelecido
+            return false;
 	}
-
+	return true;
 }
 
-// verifica apenas se uma solucao é valida, não se é a melhor solucao
-bool verificarSolucao(Instancia instancia, Node* nos, int** MA, Veiculo* veiculos, Pacote* pacotes){
-	/*
-	*** Fazer com que todos os veiculos se desloquem ao mesmo tempo
-		Nao conseguimos implementar por falta de tempo
-	*/
 
-	bool retorno = true;
+vector<Node> selecionarEntregas(vector<Node> nos){ // seleciona apenas os pontos que são de entrega (dem < 0)
+    vector<Node> entregas;
+    for(unsigned int i=0; i<nos.size(); i++)
+        if(nos[i].dem < 0)
+            entregas.push_back(nos[i]);
+    
+    return entregas;
+}
 
-	for(int k=0; k<instancia.nVeiculos; k++){
-		Veiculo veiculoAtual = veiculos[k]; // verifica um veiculo de cada vez
-		int tempo = 0; // 
+void ordenarNosPorJanelaDeTempo(vector<Node> nos){ // ordena os pontos (nesse caso de entrega) por janela de tempo (etw)
+	sort(nos.begin(), nos.end(), nodePriorityByTimeWindow);
 
-		for(int i=1; i<veiculoAtual.nPontos; i++){
-			int pAtual = veiculoAtual.rota[i];
-			int pAnterior = veiculoAtual.rota[i-1];
-
-			Node pontoAtual = nos[veiculoAtual.rota[i]];
-			Pacote pacote = pacotes[pontoAtual.idPacote];
-
-			// tempo de rota atual
-			tempo += MA[pAnterior][pAtual];
-
-			// se o ponto atual estiver "funcionando" (ou "aberto")
-			if(pontoAtual.etw > tempo and tempo < pontoAtual.ltw){
-
-				// se for um ponto de coleta e o pacote nao foi coletado e a carga do veiculo do veiculo for menor que a capacidade
-				if(pontoAtual.dem > 0 and !pacote.coletado and veiculoAtual.carga < instancia.capacity){
-					pacote.coletado = true;
-					pacote.idVeiculo = veiculoAtual.id;
-					veiculoAtual.carga += pontoAtual.dem;
-				}
-				
-				// se for um ponto de entrega e o pacote referente a esse ponto foi coletado e nao foi entregue
-				// e o veiculo atual for o veiculo que coletou o pacote
-				if(pontoAtual.dem < 0 and pacote.coletado and !pacote.entregue and pacote.idVeiculo == veiculoAtual.id){
-					pacote.entregue = true;
-					veiculoAtual.carga += pontoAtual.dem;
-				}
-			}
+	for(unsigned int i=0; i<nos.size(); i++)
+		nos[i].mostrarCampos();
+}
 
 
-			// soma no tempo total o tempo de espera. E se for só passagem???? nao implementado ainda
-			// o veiculo nao fica parado esperando o local abrir nessa verificacao, ele passa direto como se fosse apenas passagem
-		}
-		// se o tempo ultrapassar o tempo limite (para cada veiculo)
-		if(tempo > instancia.routeTime){
-			retorno = false;
-		}
-	}
+bool existirVerticesNaoVisitados(vector<Node> &nos){ // verifica se todos os nós foram visitados, caso sim ele retorna falso para encerrar o loop
+    for(unsigned int i=0; i<nos.size(); i++)
+        if(!nos[i].visitado)
+            return true;
+    return false;
+}
 
-	// se algum dos pacotes nao for entregue (baseado em todas as restricoes calculadas acima)
-	for(int i=0; i<instancia.nPacotes; i++){
-		if(!pacotes[i].entregue)
-			retorno = false;
-	}
+void criarSolucao(vector<Veiculo> &veiculos, vector<Node> &nos, int** MA, Instancia instancia, Pacote* pacotes){ // cria a solução com uma frota de veículos
+    int m = 0;
 
-	return retorno;
+    vector<Node> pontosEntrega = selecionarEntregas(nos); // seleciona apenas os pontos de entrega
+    sort(pontosEntrega.begin(), pontosEntrega.end(), nodePriorityByTimeWindow); // ordena esses pontos por janela de tempo
+
+    while(existirVerticesNaoVisitados(pontosEntrega)){ // caso exista algum vertice não visitado o loop continua, criando um novo veículo
+        Veiculo veiculo = Veiculo(m++);
+
+        vector<int> rotaAux = veiculo.rota; // cria uma rota auxiliar para fazer o teste se é uma rota válida
+        for(unsigned int i=0; i<pontosEntrega.size(); i++){
+            if(!pontosEntrega[i].visitado){
+                rotaAux.push_back(nos[pontosEntrega[i].p].id);
+                rotaAux.push_back(pontosEntrega[i].id); // se o ponto de entrega não foi visitado ele é add na rota com o seu respectivo ponto de coleta logo antes
+                rotaAux.push_back(0);
+                if(verificarRota(instancia, nos, MA, rotaAux, pacotes)){ // se a rota é válida então ela é armazenada como a rota oficial do veículo
+                    rotaAux.pop_back();
+                    pontosEntrega[i].visitado = true;
+                    veiculo.rota = rotaAux;
+                }
+                else{ // caso não seja válida é escrita a rota anterior (que é válida) narota auxiliar e testa para o próximo ponto no vetor de pontos de entrega
+                    pontosEntrega[i].visitado = false;
+                    rotaAux = veiculo.rota;
+                }
+            }
+        }
+
+        veiculo.rota.push_back(0);
+        veiculos.push_back(veiculo); // ao encerrar o loop o veículo é add na frota da solução final
+    }
 }
 
 
 int main(){
 	Instancia instancia;
-	Node* nos;
+	vector<Node> nos;
 	int** MA;
-	Veiculo *veiculos;
+	vector<Veiculo> veiculos;
 	Pacote *pacotes;
 
 	string nomeArq;
@@ -231,23 +241,13 @@ int main(){
 
 	lerArquivo(nomeArq, instancia, nos, MA);
 
-	definirPacotes(pacotes, instancia, nos);
+    criarSolucao(veiculos, nos, MA, instancia, pacotes);
 
-	gerarSolucaoAleatoria(instancia, veiculos);
+    for(unsigned int i=0; i<veiculos.size(); i++){
+        veiculos[i].mostrarRota();
+	}
 
-	bool solucao = verificarSolucao(instancia, nos, MA, veiculos, pacotes);
-
-	if(solucao)
-		cout << "A solucao e valida" << endl;
-	else
-		cout << "A solucao e invalida" << endl;
-
-	// deletar vetores alocados dinamicamente
 	delete pacotes;
-	for(int i=0; i<instancia.nVeiculos; i++)
-		delete veiculos[i].rota;
-	delete veiculos;
-	delete nos;
 	for(int i=0; i<instancia.size; i++)
 		delete MA[i];
 	delete MA;

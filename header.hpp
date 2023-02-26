@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 using namespace std;
 
 #define NAO_DEFINIDO -1
@@ -46,6 +47,8 @@ struct Node{
 	int p;
 	int d;
 
+	bool visitado = false;
+
 	int idPacote = NAO_DEFINIDO;
 
 	void mostrarCampos(){
@@ -60,6 +63,10 @@ struct Node{
 		cout << "Par de entrega: " << d << endl;
 	}
 };
+
+bool nodePriorityByTimeWindow(Node n1, Node n2) {
+    return n1.etw < n2.etw;
+}
 
 // Os pacotes que serão coletados e entregues
 // cada pacote tem seu id armazenado no seu ponto de coleta e de entrega
@@ -85,14 +92,21 @@ struct Pacote{
 // a rota segue a ordem dos índices do vetor 0 -> 1 -> 2 -> ... -> nPontos-1
 struct Veiculo{
 	int id;
-	int nPontos; // tamanho do vetor de rota
-	int *rota; // vetor com os pontos em que ele irá passar
+	vector<int> rota; // vetor com os pontos em que ele irá passar
 	int carga; // qtd que o veiculo está carregando
+
+	Veiculo(int id){
+		this->id = id;
+		rota.clear();
+		rota.push_back(0);
+		carga = 0;
+	}
 
 	void mostrarRota(){
 		cout << id << ": ";
-		for(int i=0; i<nPontos; i++)
+		for(unsigned int i=0; i<rota.size()-1; i++)
 			cout << rota[i] << "->";
+		cout << rota[rota.size()-1];
 		cout << endl;
 	}
 };
